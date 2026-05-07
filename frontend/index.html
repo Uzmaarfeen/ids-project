@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AI-IDS — Network Intrusion Detection</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg0: #080c10; --bg1: #0d1117; --bg2: #111820; --bg3: #162030;
+  --border: #1e3048;
+  --accent: #00e5ff; --accent2: #00ff88;
+  --danger: #ff3d5a; --critical: #ff0055;
+  --medium: #ff8c00; --low: #ffd700; --safe: #00ff88;
+  --warn: #ffb300;
+  --text: #c8d8e8; --muted: #4a6a8a;
+  --mono: 'Share Tech Mono', monospace;
+  --sans: 'Rajdhani', sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+body {
+  background: var(--bg0);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 15px;
+  min-height: 100vh;
+}
+
+body::before {
+  content:'';position:fixed;inset:0;
+  background: repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,229,255,0.012) 2px,rgba(0,229,255,0.012) 4px);
+  pointer-events:none;z-index:0;
+}
+
+/* Header */
+header {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 28px;
+  background:var(--bg1);border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:100;
+}
+.logo { display:flex;align-items:center;gap:14px; }
+.logo-icon {
+  width:38px;height:38px;border:2px solid var(--accent);border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--accent);font-size:20px;
+  animation:pulse-border 3s ease-in-out infinite;
+}
+@keyframes pulse-border{0%,100%{box-shadow:0 0 0 0 rgba(0,229,255,0.4)}50%{box-shadow:0 0 0 6px rgba(0,229,255,0)}}
+.logo h1{font-family:var(--sans);font-size:20px;font-weight:700;color:#fff;letter-spacing:1px}
+.logo p{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:2px}
+.header-right{display:flex;align-items:center;gap:20px}
+.status-pill{display:flex;align-items:center;gap:7px;padding:5px 14px;background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.3);border-radius:20px;font-family:var(--mono);font-size:11px;color:var(--safe)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--safe);animation:blink 1.2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+.clock{font-family:var(--mono);font-size:13px;color:var(--muted)}
+
+/* Stat cards */
+.stats-bar{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border);border-bottom:1px solid var(--border)}
+.stat-card{background:var(--bg1);padding:18px 20px;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:var(--accent)}
+.stat-card.d::before{background:var(--danger)}
+.stat-card.w::before{background:var(--warn)}
+.stat-card.g::before{background:var(--safe)}
+.stat-card.p::before{background:#b44fff}
+.stat-label{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
+.stat-value{font-family:var(--mono);font-size:28px;color:#fff;line-height:1}
+.stat-sub{margin-top:3px;font-size:11px;color:var(--muted)}
+
+/* Layout */
+.layout{display:grid;grid-template-columns:260px 1fr 320px;gap:1px;background:var(--border);min-height:calc(100vh - 135px)}
+
+/* Panel */
+.panel{background:var(--bg1);display:flex;flex-direction:column;overflow:hidden}
+.panel-hdr{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.panel-title{font-family:var(--mono);font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--accent)}
+.panel-badge{font-family:var(--mono);font-size:10px;padding:2px 8px;background:rgba(0,229,255,0.1);border:1px solid rgba(0,229,255,0.2);border-radius:4px;color:var(--accent)}
+
+/* Devices sidebar */
+.device-list{overflow-y:auto;flex:1}
+.device-item{padding:14px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.2s}
+.device-item:hover{background:var(--bg2)}
+.device-item.active{background:rgba(0,229,255,0.05);border-left:2px solid var(--accent)}
+.device-name{font-weight:600;font-size:14px;color:#fff;margin-bottom:3px}
+.device-meta{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.device-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--safe);margin-right:6px;animation:blink 1.5s infinite}
+.device-empty{padding:30px 16px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.8}
+
+/* Download button */
+.dl-btn{display:block;margin:12px;padding:10px;background:rgba(0,229,255,0.07);border:1px solid rgba(0,229,255,0.2);border-radius:6px;color:var(--accent);font-family:var(--mono);font-size:11px;text-align:center;text-decoration:none;letter-spacing:1px;transition:background 0.2s}
+.dl-btn:hover{background:rgba(0,229,255,0.14)}
+
+/* Middle: chart + feed */
+.middle{display:flex;flex-direction:column;gap:1px;background:var(--border)}
+.chart-panel{background:var(--bg1);padding:16px 20px;flex-shrink:0}
+canvas{width:100%!important;height:160px!important}
+
+/* Feed */
+.feed-panel{background:var(--bg1);display:flex;flex-direction:column;flex:1;overflow:hidden;min-height:200px}
+.feed-hdr-row{display:grid;grid-template-columns:110px 120px 80px 80px 1fr;padding:8px 16px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;background:var(--bg2);flex-shrink:0}
+.feed-wrap{overflow-y:auto;flex:1}
+.feed-row{display:grid;grid-template-columns:110px 120px 80px 80px 1fr;padding:7px 16px;border-bottom:1px solid rgba(30,48,72,0.4);font-family:var(--mono);font-size:11px;transition:background 0.15s}
+.feed-row:hover{background:var(--bg2)}
+.feed-row.threat{background:rgba(255,61,90,0.05);border-left:2px solid var(--danger)}
+.feed-row.critical{background:rgba(255,0,85,0.08);border-left:2px solid var(--critical)}
+.fc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.fc.dim{color:var(--muted)} .fc.src{color:var(--accent)}
+
+/* Alerts sidebar */
+.alerts-wrap{overflow-y:auto;flex:1}
+.alert-item{padding:12px 16px;border-bottom:1px solid var(--border);animation:slide-in 0.3s ease}
+@keyframes slide-in{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:translateX(0)}}
+.alert-top{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.badge{padding:2px 8px;border-radius:4px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:1px}
+.CRITICAL{background:rgba(255,0,85,0.15);border:1px solid var(--critical);color:var(--critical)}
+.HIGH{background:rgba(255,61,90,0.1);border:1px solid var(--danger);color:var(--danger)}
+.MEDIUM{background:rgba(255,140,0,0.1);border:1px solid var(--medium);color:var(--medium)}
+.LOW{background:rgba(255,215,0,0.1);border:1px solid var(--low);color:var(--low)}
+.alert-type{font-weight:600;font-size:14px;color:#fff}
+.alert-meta{font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:2px}
+.alert-desc{font-size:12px;color:#4a6a8a}
+.conf-bar{margin-top:6px;height:3px;background:var(--bg3);border-radius:2px}
+.conf-fill{height:100%;border-radius:2px;background:var(--accent);transition:width 0.4s}
+
+/* Overlay */
+#overlay{position:fixed;inset:0;background:rgba(8,12,16,0.96);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999;font-family:var(--mono)}
+#overlay h2{color:var(--accent);font-size:18px;letter-spacing:3px}
+#overlay p{color:var(--muted);font-size:12px}
+#overlay.hidden{display:none}
+.spinner{width:30px;height:30px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-track{background:var(--bg1)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+</style>
+</head>
+<body>
+  <div id="login-box" style="
+position:fixed;
+inset:0;
+background:#080c10;
+display:flex;
+justify-content:center;
+align-items:center;
+z-index:99999;
+flex-direction:column;
+gap:15px;
+">
+
+<h2 style="
+color:#00e5ff;
+font-family:'Share Tech Mono', monospace;
+font-size:28px;
+">
+AI-IDS LOGIN
+</h2>
+
+<input
+id="username"
+placeholder="Username"
+style="
+padding:12px;
+width:260px;
+background:#111820;
+border:1px solid #1e3048;
+color:white;
+outline:none;
+"
+/>
+
+<input
+id="password"
+type="password"
+placeholder="Password"
+style="
+padding:12px;
+width:260px;
+background:#111820;
+border:1px solid #1e3048;
+color:white;
+outline:none;
+"
+/>
+
+<button
+onclick="login()"
+style="
+padding:12px 25px;
+background:#00e5ff;
+border:none;
+cursor:pointer;
+font-weight:bold;
+"
+>
+LOGIN
+</button>
+
+<p id="login-error" style="color:red;"></p>
+
+</div>
+
+<div id="overlay">
+  <div class="spinner"></div>
+  <h2>AI-IDS MONITOR</h2>
+  <p id="conn-msg">Connecting to backend...</p>
+</div>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⬡</div>
+    <div>
+      <h1>AI-IDS MONITOR</h1>
+      <p>REAL-TIME INTRUSION DETECTION SYSTEM</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill"><div class="dot"></div><span id="status-txt">CONNECTING</span></div>
+    <div class="clock" id="clock">--:--:--</div>
+  </div>
+</header>
+
+<div class="stats-bar">
+  <div class="stat-card">
+    <div class="stat-label">Total Packets</div>
+    <div class="stat-value" id="s-pkts">0</div>
+    <div class="stat-sub">All devices combined</div>
+  </div>
+  <div class="stat-card d">
+    <div class="stat-label">Threats Found</div>
+    <div class="stat-value" id="s-threats">0</div>
+    <div class="stat-sub">Across all agents</div>
+  </div>
+  <div class="stat-card w">
+    <div class="stat-label">Threat Rate</div>
+    <div class="stat-value" id="s-rate">0%</div>
+    <div class="stat-sub">Of total traffic</div>
+  </div>
+  <div class="stat-card p">
+    <div class="stat-label">Active Devices</div>
+    <div class="stat-value" id="s-agents">0</div>
+    <div class="stat-sub">Agents connected</div>
+  </div>
+  <div class="stat-card g">
+    <div class="stat-label">Uptime</div>
+    <div class="stat-value" id="s-uptime">00:00</div>
+    <div class="stat-sub">Monitoring duration</div>
+  </div>
+</div>
+
+<div class="layout">
+
+  <!-- Left: connected devices -->
+  <div class="panel">
+    <div class="panel-hdr">
+      <span class="panel-title">Connected Devices</span>
+      <span class="panel-badge" id="agent-badge">0</span>
+    </div>
+    <div class="device-list" id="device-list">
+      <div class="device-empty">
+        No devices connected yet.<br><br>
+        Download the agent below<br>and run it on any laptop.
+      </div>
+    </div>
+    <a class="dl-btn" href="/download-agent" download="agent.py">⬇ Download Agent (agent.py)</a>
+  </div>
+
+  <!-- Middle: chart + packet feed -->
+  <div class="middle">
+    <div class="chart-panel">
+      <div class="panel-hdr" style="padding:0 0 10px 0;border:none">
+        <span class="panel-title">Live Traffic</span>
+        <span class="panel-badge" id="pps-badge">0 pkt/s</span>
+      </div>
+      <canvas id="chart"></canvas>
+    </div>
+
+    <div class="feed-panel">
+      <div class="panel-hdr">
+        <span class="panel-title">Packet Stream</span>
+        <span class="panel-badge">LIVE</span>
+      </div>
+      <div class="feed-hdr-row">
+        <div>Time</div><div>Source IP</div><div>Protocol</div><div>Port</div><div>Status</div>
+      </div>
+      <div class="feed-wrap" id="feed"></div>
+    </div>
+  </div>
+
+  <!-- Right: alerts -->
+  <div class="panel">
+    <div class="panel-hdr">
+      <span class="panel-title">Alert Feed</span>
+      <span class="panel-badge" id="alert-badge">0</span>
+    </div>
+    <div class="alerts-wrap" id="alerts-list">
+      <div style="padding:30px 16px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--muted)">
+        Monitoring for threats...
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Clock
+setInterval(() => document.getElementById('clock').textContent = new Date().toLocaleTimeString(), 1000);
+
+// Uptime
+const startTime = Date.now();
+setInterval(() => {
+  const s = Math.floor((Date.now()-startTime)/1000);
+  document.getElementById('s-uptime').textContent =
+    String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+}, 1000);
+
+// Chart
+const labels = Array(60).fill(''), normal = Array(60).fill(0), threats = Array(60).fill(0);
+let pktBucket = 0, threatBucket = 0;
+const chart = new Chart(document.getElementById('chart').getContext('2d'), {
+  type:'line',
+  data:{labels,datasets:[
+    {label:'Normal',data:normal,borderColor:'#00e5ff',backgroundColor:'rgba(0,229,255,0.06)',borderWidth:1.5,fill:true,tension:0.4,pointRadius:0},
+    {label:'Threats',data:threats,borderColor:'#ff3d5a',backgroundColor:'rgba(255,61,90,0.08)',borderWidth:1.5,fill:true,tension:0.4,pointRadius:0},
+  ]},
+  options:{animation:false,responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'#4a6a8a',font:{family:'Share Tech Mono',size:11},boxWidth:12}}},
+    scales:{x:{display:false},y:{beginAtZero:true,ticks:{color:'#4a6a8a',font:{family:'Share Tech Mono',size:10},maxTicksLimit:5},grid:{color:'rgba(30,48,72,0.5)'}}}
+  }
+});
+setInterval(() => {
+  normal.shift(); normal.push(pktBucket);
+  threats.shift(); threats.push(threatBucket);
+  labels.shift(); labels.push('');
+  document.getElementById('pps-badge').textContent = pktBucket + ' pkt/s';
+  chart.update('none');
+  pktBucket = 0; threatBucket = 0;
+}, 1000);
+
+// State
+let totalPkts = 0, totalThreats = 0, alertCount = 0;
+const agents = {};
+
+function updateStats(s) {
+  if (!s) return;
+  totalPkts    = s.total_packets    || totalPkts;
+  totalThreats = s.threats_detected || totalThreats;
+  document.getElementById('s-pkts').textContent    = totalPkts.toLocaleString();
+  document.getElementById('s-threats').textContent = totalThreats.toLocaleString();
+  document.getElementById('s-agents').textContent  = s.active_agents || Object.keys(agents).length;
+  const rate = totalPkts > 0 ? ((totalThreats/totalPkts)*100).toFixed(1) : '0.0';
+  document.getElementById('s-rate').textContent = rate + '%';
+}
+
+// Device list
+function renderDevices() {
+  const list = document.getElementById('device-list');
+  const keys = Object.keys(agents);
+  document.getElementById('agent-badge').textContent = keys.length;
+  if (!keys.length) {
+    list.innerHTML = '<div class="device-empty">No devices connected yet.<br><br>Download the agent below<br>and run it on any laptop.</div>';
+    return;
+  }
+  list.innerHTML = keys.map(id => {
+    const a = agents[id];
+    return `<div class="device-item">
+      <div class="device-name"><span class="device-dot"></span>${a.device_name||'Unknown'}</div>
+      <div class="device-meta">${a.os||''}</div>
+      <div class="device-meta" style="margin-top:3px">${(a.packet_count||0).toLocaleString()} packets</div>
+    </div>`;
+  }).join('');
+}
+
+// Feed
+const feed = document.getElementById('feed');
+let feedRows = [], feedReady = false;
+function addFeedRow(data, isThreat, severity) {
+  if (!feedReady) { feed.innerHTML = ''; feedReady = true; }
+  const ts = new Date(data.timestamp||Date.now()).toLocaleTimeString('en-GB',{hour12:false});
+  const row = document.createElement('div');
+  row.className = severity==='CRITICAL' ? 'feed-row critical' : isThreat ? 'feed-row threat' : 'feed-row';
+  const statusColor = isThreat ? (severity==='CRITICAL'?'var(--critical)':'var(--danger)') : 'var(--safe)';
+  const statusText  = isThreat ? `[${data.analysis?.threat_type||'THREAT'}]` : '[SAFE]';
+  row.innerHTML = `
+    <div class="fc dim">${ts}</div>
+    <div class="fc src">${data.src_ip||'—'}</div>
+    <div class="fc dim">${data.protocol||'—'}</div>
+    <div class="fc dim">${data.dst_port||'—'}</div>
+    <div class="fc" style="color:${statusColor}">${statusText}</div>
+  `;
+  feedRows.push(row);
+  if (feedRows.length > 300) feedRows.shift().remove();
+  feed.appendChild(row);
+  feed.scrollTop = feed.scrollHeight;
+}
+
+// Alerts
+const alertsList = document.getElementById('alerts-list');
+let alertsReady = false;
+function addAlert(alert) {
+  if (!alertsReady) { alertsList.innerHTML = ''; alertsReady = true; }
+  alertCount++;
+  document.getElementById('alert-badge').textContent = alertCount;
+  const el = document.createElement('div');
+  el.className = 'alert-item';
+  const conf = Math.round((alert.confidence||0)*100);
+  el.innerHTML = `
+    <div class="alert-top">
+      <span class="badge ${alert.severity}">${alert.severity}</span>
+      <span class="alert-type">${alert.threat_type}</span>
+    </div>
+    <div class="alert-meta">${alert.device||alert.src_ip} → :${alert.dst_port} &nbsp;|&nbsp; ${conf}% conf</div>
+    <div class="alert-desc">${alert.description||''}</div>
+    <div class="conf-bar"><div class="conf-fill" style="width:${conf}%"></div></div>
+  `;
+  alertsList.insertBefore(el, alertsList.firstChild);
+}
+
+// WebSocket
+const overlay = document.getElementById('overlay');
+const connMsg = document.getElementById('conn-msg');
+let ws, retryTimer;
+
+function connect() {
+  ws = new WebSocket('ws://localhost:8000/ws');
+
+  ws.onopen = () => {
+    overlay.classList.add('hidden');
+    document.getElementById('status-txt').textContent = 'ACTIVE';
+    clearTimeout(retryTimer);
+  };
+
+  ws.onmessage = (evt) => {
+    const msg = JSON.parse(evt.data);
+
+    if (msg.type === 'init') {
+      (msg.agents||[]).forEach(a => { agents[a.agent_id] = a; });
+      renderDevices();
+      (msg.alerts||[]).forEach(a => addAlert(a));
+      updateStats(msg.stats);
+      return;
+    }
+
+    if (msg.type === 'stats') {
+      updateStats(msg.stats);
+      (msg.agents||[]).forEach(a => { agents[a.agent_id] = a; });
+      renderDevices();
+      return;
+    }
+
+    if (msg.type === 'agent_connected') {
+      agents[msg.agent_id] = { device_name: msg.device_name, os: msg.os, packet_count: 0 };
+      renderDevices();
+      return;
+    }
+
+    if (msg.type === 'agent_disconnected') {
+      delete agents[msg.agent_id];
+      renderDevices();
+      return;
+    }
+
+    if (msg.type === 'packet') {
+      const data = msg.data || {};
+      pktBucket++;
+      if (msg.is_threat) threatBucket++;
+      if (msg.agent_id && agents[msg.agent_id]) {
+        agents[msg.agent_id].packet_count = (agents[msg.agent_id].packet_count||0) + 1;
+      }
+      addFeedRow(data, msg.is_threat, data.analysis?.severity);
+      updateStats(msg.stats);
+      if (msg.is_threat && msg.alert) addAlert(msg.alert);
+    }
+  };
+
+  ws.onclose = () => {
+    overlay.classList.remove('hidden');
+    document.getElementById('status-txt').textContent = 'DISCONNECTED';
+    connMsg.textContent = 'Reconnecting in 3s... Is main.py running?';
+    retryTimer = setTimeout(connect, 3000);
+  };
+
+  ws.onerror = () => {
+    connMsg.textContent = 'Cannot reach backend. Run: python main.py';
+  };
+}
+async function login() {
+
+  const username = document.getElementById("username").value;
+  const password = document.getElementById("password").value;
+
+  const formData = new FormData();
+
+  formData.append("username", username);
+  formData.append("password", password);
+
+  const response = await fetch("/login", {
+    method: "POST",
+    body: formData
+  });
+
+  const data = await response.json();
+
+  if (true) {
+
+    localStorage.setItem("token", data.token);
+
+    document.getElementById("login-box").style.display = "none";
+
+  } else {
+
+    document.getElementById("login-error").innerText =
+      "Invalid username or password";
+
+  }
+}
+connect();
+</script>
+</body>
+</html>
